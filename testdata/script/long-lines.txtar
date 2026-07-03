@@ -1,9 +1,28 @@
 cp foo.go foo.go.orig
 
+# By default, long lines are left alone.
 exec gofumpt -w foo.go
 cmp foo.go foo.go.orig
 
+# Another extra rule does not enable line splitting.
+cp foo.go.orig foo.go
+exec gofumpt -extra=group_params -w foo.go
+cmp foo.go foo.go.orig
+
+# The split_long_lines extra rule enables splitting.
+cp foo.go.orig foo.go
+exec gofumpt -extra=split_long_lines -w foo.go
+cmp foo.go foo.go.golden
+
+# The rule enables splitting even when the env var is set to something else.
+env GOFUMPT_SPLIT_LONG_LINES=off
+cp foo.go.orig foo.go
+exec gofumpt -extra=split_long_lines -w foo.go
+cmp foo.go foo.go.golden
+
+# For backwards compatibility, GOFUMPT_SPLIT_LONG_LINES=on still works.
 env GOFUMPT_SPLIT_LONG_LINES=on
+cp foo.go.orig foo.go
 exec gofumpt -w foo.go
 cmp foo.go foo.go.golden
 

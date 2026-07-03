@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+Add a `split_long_lines` extra rule to enable splitting long lines, such as
+function calls, into multiple lines, via `-extra=split_long_lines`. This behavior
+was previously only available via the `GOFUMPT_SPLIT_LONG_LINES=on` environment
+variable, which still works.
+
 Narrow the multi-line function call rule to only place the closing parenthesis
 on its own line when the opening parenthesis ends a line. See #74.
 

@@ -24,7 +24,6 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/tools/go/ast/astutil"
-
 	"mvdan.cc/gofumpt/internal/govendor/go/format"
 	"mvdan.cc/gofumpt/internal/version"
 )
@@ -83,6 +82,10 @@ type Extra struct {
 
 	// ClotheReturns clothes naked returns in functions with named results.
 	ClotheReturns bool
+
+	// SplitLongLines splits over-long lines, e.g. function calls, into multiple lines.
+	// GOFUMPT_SPLIT_LONG_LINES=on also enables it, for backwards compatibility.
+	SplitLongLines bool
 }
 
 func (e *Extra) String() string {
@@ -93,6 +96,9 @@ func (e *Extra) String() string {
 	if e.ClotheReturns {
 		active = append(active, "clothe_returns")
 	}
+	if e.SplitLongLines {
+		active = append(active, "split_long_lines")
+	}
 	return strings.Join(active, ",")
 }
 
@@ -100,6 +106,7 @@ func (e *Extra) Set(v string) error {
 	if v == "true" {
 		e.GroupParams = true
 		e.ClotheReturns = true
+		e.SplitLongLines = true
 		return nil
 	}
 	*e = Extra{}
@@ -112,6 +119,8 @@ func (e *Extra) Set(v string) error {
 			e.GroupParams = true
 		case "clothe_returns":
 			e.ClotheReturns = true
+		case "split_long_lines":
+			e.SplitLongLines = true
 		default:
 			return fmt.Errorf("unknown rule: %q", s)
 		}
@@ -152,6 +161,11 @@ func File(fset *token.FileSet, file *ast.File, opts Options) {
 
 	if opts.ExtraRules {
 		opts.Extra.Set("true") // enable all the extra rules
+	}
+
+	// GOFUMPT_SPLIT_LONG_LINES=on enables the rule, for backwards compatibility.
+	if os.Getenv("GOFUMPT_SPLIT_LONG_LINES") == "on" {
+		opts.Extra.SplitLongLines = true
 	}
 
 	if opts.LangVersion == "" {
@@ -442,7 +456,12 @@ func commentGroupLooksLikeCode(group *ast.CommentGroup) bool {
 	src := "package p\nfunc _() {\n" + group.Text() + "}\n"
 	// AllErrors avoids the parser's panic/recover bailout on too many errors,
 	// which crashes under tinygo's Wasm target as it lacks recover support.
-	file, err := parser.ParseFile(token.NewFileSet(), "", src, parser.SkipObjectResolution|parser.AllErrors)
+	file, err := parser.ParseFile(
+		token.NewFileSet(),
+		"",
+		src,
+		parser.SkipObjectResolution|parser.AllErrors,
+	)
 	if err != nil {
 		return false
 	}
@@ -772,7 +791,8 @@ func (f *fumpter) applyPre(c *astutil.Cursor) {
 				handleMultiLine(sign.Params)
 				if sign.Results != nil && len(sign.Results.List) > 0 {
 					lastResultLine := f.Line(sign.Results.List[len(sign.Results.List)-1].End())
-					isLastResultOnParamClosingLine := sign.Params != nil && lastResultLine == f.Line(sign.Params.Closing)
+					isLastResultOnParamClosingLine := sign.Params != nil &&
+						lastResultLine == f.Line(sign.Params.Closing)
 					if !isLastResultOnParamClosingLine {
 						handleMultiLine(sign.Results)
 					}
@@ -1021,9 +1041,8 @@ func (f *fumpter) applyPost(c *astutil.Cursor) {
 }
 
 func (f *fumpter) splitLongLine(c *astutil.Cursor) {
-	if os.Getenv("GOFUMPT_SPLIT_LONG_LINES") != "on" {
-		// By default, this feature is turned off.
-		// Turn it on by setting GOFUMPT_SPLIT_LONG_LINES=on.
+	if !f.Extra.SplitLongLines {
+		// Off by default; opt in with -extra=split_long_lines.
 		return
 	}
 	node := c.Node()

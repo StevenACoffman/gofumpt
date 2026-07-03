@@ -134,7 +134,7 @@ func usage() {
 	-e        report all errors (not just the first 10 on different lines)
 	-l        list files whose formatting differs from gofumpt's
 	-w        write result to (source) file instead of stdout
-	-extra    enable extra rules, e.g. -extra=group_params,clothe_returns
+	-extra    enable extra rules, e.g. -extra=group_params,clothe_returns,split_long_lines
 
 	-lang       str    target Go version in the form "go1.X" (default from go.mod)
 	-modpath    str    Go module path containing the source file (default from go.mod)
